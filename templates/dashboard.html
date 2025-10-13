@@ -1,0 +1,48 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="jumbotron text-center" style="margin-top: 8%; font-family:'Karla';">
+      <h1 align=left><b>Dashboard</b></h1></br>
+      <img class="rounded-circle" src="/static/images/{{session.emp_id}}.jpg" height="200px">
+      <h3>Welcome {{session.name}}</h3>
+
+</div>
+
+<div class= "jumbotron">
+	<div>
+		<h3 align=left class="hcol1">Attendance</h3>
+		<form method="POST" action="">
+			<div>
+				<div class='form-group'>
+					<label for="from">From</label>
+			 		<input type="date" class="form-control" name="from" max="3000-12-31" min="1000-01-01" placeholder='From' style="width: 400px;">
+				</div>
+				<div class='form-group'>
+					<label for="to">To</label>
+			 		<input type="date" class ="form-control" name="to" max="3000-12-31" min="1000-01-01" placeholder='to' style="width: 400px;">
+				</div>
+				<button type="submit" class='attendancebtn' name="btn" value="attendance">Get Info</button>
+			</div>
+		</form>
+	</div>
+</div>
+<div class= "jumbotron">
+	<div>
+		<h3 align=left class="hcol1">Incentive</h3>
+		<form method="POST" action="" id="incentive">
+			<div>
+				<div class='form-group'>
+					<label for="fromm">From</label>
+			 		<input type="date" class="form-control" name="fromm" max="3000-12-31" min="1000-01-01" placeholder='From' style="width: 400px;">
+				</div>
+				<div class='form-group'>
+					<label for="too">To</label>
+			 		<input type="date" class ="form-control" name="too" max="3000-12-31" min="1000-01-01" placeholder='to' style="width: 400px;">
+				</div>
+				<button type="submit" class='attendancebtn' name="btn" value="attendance">Get Info</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+{% endblock %}

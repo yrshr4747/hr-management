@@ -1,0 +1,90 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="container" style="margin-top: 8%;">
+    <h1 class="text-center mb-5">Edit Hierarchy</h1>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Add Department</h5>
+                    <hr>
+                    <form method="POST" action="">
+                        <input type="hidden" name="btn" value="form1">
+                        {{ form1.hidden_tag() }}
+
+                        <div class="form-group mb-3">
+                            {{ form1.department.label(class="form-label") }}
+                            {{ form1.department(class="form-control") }}
+                        </div>
+                        <div class="form-group mb-3">
+                            {{ form1.designation.label(class="form-label") }}
+                            {{ form1.designation(class="form-control") }}
+                        </div>
+                        <div class="form-group mb-3">
+                            {{ form1.salary.label(class="form-label") }}
+                            {{ form1.salary(class="form-control") }}
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Add Designation</h5>
+                    <hr>
+                    <form method="POST" action="">
+                        <input type="hidden" name="btn" value="form2">
+                        {{ form2.hidden_tag() }}
+
+                        <div class="form-group mb-3">
+                            {{ form2.department.label(class="form-label") }}
+                            {{ form2.department(class="form-select") }}
+                        </div>
+                        <div class="form-group mb-3">
+                            {{ form2.designation.label(class="form-label") }}
+                            {{ form2.designation(class="form-control") }}
+                        </div>
+                        <div class="form-group mb-3">
+                            {{ form2.salary.label(class="form-label") }}
+                            {{ form2.salary(class="form-control") }}
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Update Salary</h5>
+                    <hr>
+                    <form method="POST" action="">
+                        <input type="hidden" name="btn" value="form3">
+                        {{ form3.hidden_tag() }}
+
+                        <div class="form-group mb-3">
+                            {{ form3.department.label(class="form-label") }}
+                            {{ form3.department(class="form-select") }}
+                        </div>
+                        <div class="form-group mb-3">
+                            {{ form3.designation.label(class="form-label") }}
+                            {{ form3.designation(class="form-select") }}
+                        </div>
+                         <div class="form-group mb-3">
+                            {{ form3.salary.label(class="form-label") }}
+                            {{ form3.salary(class="form-control") }}
+                        </div>
+                        <button type="submit" class="btn btn-info">Update</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

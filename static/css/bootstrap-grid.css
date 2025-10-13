@@ -1,0 +1,203 @@
+/*!
+ * Bootstrap Grid v4.0.0 (https://getbootstrap.com)
+ * Refactored into a modern, maintainable SCSS structure.
+ * Original Copyright 2011-2018 The Bootstrap Authors
+ * Licensed under MIT
+ */
+
+//=================================================================
+// 1. CONFIGURATION: All grid settings are controlled from here.
+//=================================================================
+
+// The total number of columns in the grid.
+$grid-columns: 12;
+
+// The width of the gutter between columns.
+$grid-gutter-width: 30px;
+
+// A map of responsive breakpoints. You can add, remove, or change these.
+$grid-breakpoints: (
+  // Extra small screen / mobile
+  xs: 0,
+  // Small screen / phone
+  sm: 576px,
+  // Medium screen / tablet
+  md: 768px,
+  // Large screen / desktop
+  lg: 992px,
+  // Extra large screen / wide desktop
+  xl: 1200px
+);
+
+// A map defining the max-width of the `.container` at each breakpoint.
+$container-max-widths: (
+  sm: 540px,
+  md: 720px,
+  lg: 960px,
+  xl: 1140px
+);
+
+
+//=================================================================
+// 2. CORE SYSTEM: The foundational styles for the grid.
+//=================================================================
+
+// Universal box-sizing for a more intuitive layout model.
+html {
+  box-sizing: border-box;
+}
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+// The `.container` class provides a responsive, fixed-width layout.
+.container {
+  width: 100%;
+  padding-right: $grid-gutter-width / 2;
+  padding-left: $grid-gutter-width / 2;
+  margin-right: auto;
+  margin-left: auto;
+
+  // Generate max-width for each breakpoint.
+  @each $breakpoint, $max-width in $container-max-widths {
+    @media (min-width: map-get($grid-breakpoints, $breakpoint)) {
+      max-width: $max-width;
+    }
+  }
+}
+
+// The `.container-fluid` class provides a full-width layout.
+.container-fluid {
+  width: 100%;
+  padding-right: $grid-gutter-width / 2;
+  padding-left: $grid-gutter-width / 2;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+// The `.row` is a flex container for columns.
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  // Negative margins counteract the column padding to align content with the container edges.
+  margin-right: -($grid-gutter-width / 2);
+  margin-left: -($grid-gutter-width / 2);
+}
+
+// Utility to remove gutters from a row and its columns.
+.no-gutters {
+  margin-right: 0;
+  margin-left: 0;
+
+  > .col,
+  > [class*="col-"] {
+    padding-right: 0;
+    padding-left: 0;
+  }
+}
+
+
+//=================================================================
+// 3. DYNAMIC CLASS GENERATION: Loops create all grid classes.
+//=================================================================
+
+// Define a mixin (a reusable block of code) to generate all grid classes.
+@mixin generate-grid-system($breakpoints: $grid-breakpoints) {
+
+  // Generate base classes for the smallest breakpoint (xs)
+  @media (min-width: map-get($breakpoints, xs)) {
+    // Base column styles
+    .col, [class*="col-"] {
+      position: relative;
+      width: 100%;
+      min-height: 1px;
+      padding-right: $grid-gutter-width / 2;
+      padding-left: $grid-gutter-width / 2;
+    }
+
+    .col {
+      flex-basis: 0;
+      flex-grow: 1;
+      max-width: 100%;
+    }
+
+    .col-auto {
+      flex: 0 0 auto;
+      width: auto;
+      max-width: none;
+    }
+
+    // Generate `.col-1` to `.col-12`
+    @for $i from 1 through $grid-columns {
+      .col-#{$i} {
+        flex: 0 0 percentage($i / $grid-columns);
+        max-width: percentage($i / $grid-columns);
+      }
+    }
+
+    // Generate `.offset-1` to `.offset-11`
+    @for $i from 1 through ($grid-columns - 1) {
+      .offset-#{$i} {
+        margin-left: percentage($i / $grid-columns);
+      }
+    }
+
+    // Generate order classes `.order-0` to `.order-12`
+    .order-first { order: -1; }
+    .order-last { order: $grid-columns + 1; }
+    @for $i from 0 through $grid-columns {
+      .order-#{$i} { order: $i; }
+    }
+  }
+
+  // Loop through all breakpoints (sm, md, lg, xl) to generate responsive classes
+  @each $breakpoint, $min-width in $breakpoints {
+    @if $min-width > 0 {
+      @media (min-width: $min-width) {
+        $infix: "-#{$breakpoint}"; // e.g., "-sm", "-md"
+
+        // Auto-layout columns like `.col-sm`, `.col-md-auto`
+        .col#{$infix} {
+          flex-basis: 0;
+          flex-grow: 1;
+          max-width: 100%;
+        }
+        .col#{$infix}-auto {
+          flex: 0 0 auto;
+          width: auto;
+          max-width: none;
+        }
+
+        // Generate responsive column classes like `.col-sm-6`
+        @for $i from 1 through $grid-columns {
+          .col#{$infix}-#{$i} {
+            flex: 0 0 percentage($i / $grid-columns);
+            max-width: percentage($i / $grid-columns);
+          }
+        }
+
+        // Generate responsive offset classes like `.offset-md-3`
+        .offset#{$infix}-0 { margin-left: 0; }
+        @for $i from 1 through ($grid-columns - 1) {
+          .offset#{$infix}-#{$i} {
+            margin-left: percentage($i / $grid-columns);
+          }
+        }
+
+        // Generate responsive order classes like `.order-lg-first`
+        .order#{$infix}-first { order: -1; }
+        .order#{$infix}-last { order: $grid-columns + 1; }
+        @for $i from 0 through $grid-columns {
+          .order#{$infix}-#{$i} { order: $i; }
+        }
+      }
+    }
+  }
+}
+
+// Execute the mixin to generate all grid classes.
+@include generate-grid-system();
+
+// NOTE: The flexbox and display utilities (.d-flex, .justify-content-center, etc.)
+// from the original file can also be refactored using similar loops and mixins
+// but are omitted here for brevity.

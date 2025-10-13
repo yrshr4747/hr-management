@@ -1,0 +1,28 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div style="margin-top:8%;">
+<div class='hcol1 jumbotron' style="width:500px;;margin:auto;">
+  	<p align =center style="font-size:62px;">Salary</p>
+	<form method="POST" action="">
+		<div class='form-group'>
+			<input class="form-control" id="emp_id" name="emp_id" required="" type="text" value="">
+		    <span class="form-highlight"></span>
+		    <span class="form-bar"></span>
+		    <label class="float-label" for="emp_id">Employee Id</label>
+		</div>
+		<div class='form-group'>
+			<label for="from">From</label>
+	 		<input type="date" class="form-control" name="from" max="3000-12-31" min="1000-01-01" placeholder='From'>
+		</div>
+		<div class='form-group'>
+			<label for="to">To</label>
+	 		<input type="date" class ="form-control" name="to" max="3000-12-31" min="1000-01-01" placeholder='to'>
+		</div>
+		<div class='form-group'>
+			<p align=center><button type="submit" name ='btn' value='cal' class='btn btn-info'>Calculate</button> <button type="submit" name ='btn' value='gen' class='btn btn-info'>Generate Payroll</button></p>
+		</div>
+	</form>
+</div>
+</div>
+{% endblock %}

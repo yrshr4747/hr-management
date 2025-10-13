@@ -1,0 +1,60 @@
+
+<nav class="navbar navbar-expand-md navbar-light bg-light border-bottom fixed-top" style="">
+    <div class="navbar-collapse collapse w-100 order-1 order-md-0 dual-collapse2">
+        <ul class="navbar-nav mr-auto">
+            {% if session.logged_in %}
+            <li class="nav-item">
+                <a class="nav-link" href="/dashboard">Dashboard</a>
+            </li>
+            {% endif %}
+            {% if session.admin_logged_in %}
+            <li class="nav-item dropdown">
+                <a class="nav-link dropbtn" href="#">Employee</a>
+                <div class="dropdown-content">
+                     <a class="dropdown-item" href="/employee/view">View</a>
+                     <a class="dropdown-item" href="/employee/add">Add</a>
+                     <a class="dropdown-item" href="/employee/change_department">Change Department</a>
+                </div>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/attendance">Attendance</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/incentive">Incentive</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/salary">Salary</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/hierarchy">Hierarchy</a>
+            </li>
+            {% endif %}
+            <li class="nav-item">
+                <a class="nav-link" href="/about">About</a>
+            </li>
+        </ul>
+    </div>
+    <div class="mx-auto order-0">
+        <a class="navbar-brand mx-auto" href="#">HR Manager</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target=".dual-collapse2">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+    <div class="navbar-collapse collapse w-100 order-3 dual-collapse2">
+        <ul class="navbar-nav ml-auto">
+            {% if session.logged_in %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/profile/{{session.emp_id}}">Profile</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/logout">Logout</a>
+                </li>
+            {% else %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/login">Login</a>
+                </li>
+            {% endif %}
+
+        </ul>
+    </div>
+</nav>

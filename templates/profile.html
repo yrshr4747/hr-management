@@ -1,48 +1,47 @@
-py
 {% extends 'layout.html' %}
 
 {% block body %}
 
-<div class="jumbotron text-center" style="margin-top: 8%; font-family:'Karla';">
-      <h1 align=left><b>Your profile</b></h1></br>
-      <img class="rounded-circle" src="/static/images/{{employee.emp_id|string}}.jpg" height="200px">
-      <h3>{{employee.name}}</h3>
-      <h4>{{employee.designation}}, {{employee.department}}</h4>
-      {% if session.emp_id==employee.emp_id %}
-        <button type="button" class="btn btn-info" name="btn" value="edit_profile" onclick="window.open('/edit_profile/{{employee.emp_id}}', '_top');">Edit Profile</button>
-        <button type="button" class="btn btn-info" name="btn" value="change_password" onclick="window.open('/change_password', '_top');">Change Password</button>
-      {% endif %}
+<div class="container-fluid py-4">
+    <div class="card p-5">
 
+        <div class="text-center mb-4">
+
+            <img src="{{ url_for('static', filename='images/' + employee.emp_id|string + '.jpg') }}?v={{ cache_buster }}"
+                 alt="{{ employee.name }}'s Profile Picture"
+                 class="rounded-circle mb-3 shadow-sm"
+                 style="width: 200px; height: 200px; object-fit: cover; border: 4px solid #f0f0f0; box-shadow: 0 6px 15px rgba(0,0,0,0.15);"
+                 onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/default.jpg') }}';">
+
+            <h2 class="mb-1 display-5">{{ employee.name }}</h2>
+            <p class="lead text-muted">{{ employee.designation }} in {{ employee.department }}</p>
+
+            {% if session.emp_id|string == employee.emp_id|string %}
+                <div class="mt-4">
+                    <a href="/edit_profile/{{employee.emp_id}}" class="btn btn-info btn-lg me-2">Edit Profile</a>
+                    <a href="/change_password" class="btn btn-primary btn-lg">Change Password</a>
+                </div>
+            {% endif %}
+        </div>
+
+        <hr class="my-5">
+
+        <div class="row g-4">
+            <div class="col-md-6">
+                <h4 class="mb-3 text-orange">Personal Information</h4>
+                <p><strong>Gender:</strong> {{ employee.gender | capitalize }}</p>
+                <p><strong>Birthday:</strong> {% if employee.dob %}{{ employee.dob.strftime('%d %B, %Y') }}{% else %}Not specified{% endif %}</p>
+                <p><strong>Nationality:</strong> {{ employee.nationality | capitalize }}</p>
+            </div>
+            <div class="col-md-6">
+                <h4 class="mb-3 text-orange">Contact Details</h4>
+                <p><strong>Mobile Number:</strong> {{ employee.contact }}</p>
+                <p><strong>E-mail:</strong> {{ employee.email }}</p>
+                <p><strong>Address:</strong> {{ employee.address }}, {{ employee.city }}, {{ employee.state }} - {{ employee.pincode }}</p>
+            </div>
+        </div>
+
+    </div>
 </div>
 
-<div class= "jumbotron">
-	<h3 align=left style="font-size = 50px; font-family = 'Karla'"><b>Personal Information</b></h3>
-<br>
-  <h5 align=left id="gendervar" data-gendervar = "{{employee.gender}}" ></h5>
-  <h5 align=left><b>Birthday : {{employee.dob}}</b></h5>
-  <h5 align=left><b>Nationality : {{employee.gender}}</b></h5>
-</div>
-
-<div class= "jumbotron">
-	<h3 align=left><b>Contact Details</b></h3>
-<br>
-  <h5 align=left><b>Mobile Number : {{employee.contact}}</b></h5>
-  <h5 align=left><b>E-mail : {{employee.email}}</b></h5>
-  <h5 align=left><b>Location : {{employee.address}}</b></h5>
-  <h5 align=left><b>City : {{employee.city}}</b></h5>
-  <h5 align=left><b>State : {{employee.state}}</b></h5>
-  <h5 align=left><b>Pincode : {{employee.pincode}}</b></h5>
-</div>
-
-
-<script>
-
-
-$(document).ready(function(){
-  var gendervar = document.getElementById("gendervar").dataset.gendervar;
-  gendervar = gendervar.charAt(0).toUpperCase() + gendervar.slice(1);
-  document.getElementById("gendervar").innerHTML = '<b>Gender :  '+gendervar+'</b>'
-});
-
-</script>
 {% endblock %}

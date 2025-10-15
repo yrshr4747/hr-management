@@ -125,3 +125,26 @@ var wskCheckbox = function() {
 }();
 
 wskCheckbox.init();
+// Sidebar toggle
+document.getElementById("menu-toggle").addEventListener("click", () => {
+    document.getElementById("wrapper").classList.toggle("toggled");
+});
+
+// Fetch dashboard data dynamically
+fetch('/dashboard_data')
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById('totalEmp').textContent = data.total_employees;
+    document.getElementById('totalDept').textContent = data.total_departments;
+
+    new Chart(document.getElementById('salaryChart'), {
+      type: 'bar',
+      data: {
+        labels: data.salaries.labels,
+        datasets: [{
+          label: 'Salary',
+          data: data.salaries.values
+        }]
+      }
+    });
+  });

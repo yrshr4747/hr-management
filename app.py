@@ -4,12 +4,15 @@ from wtforms import StringField, TextAreaField, PasswordField, validators, Selec
 from flask_wtf.file import FileField
 from passlib.hash import sha256_crypt
 from functools import wraps
-from datetime import timedelta
+from datetime import date, timedelta
 from werkzeug.utils import secure_filename
 # from flask_reuploaded import UploadSet, configure_uploads, IMAGES
 # import pdfkit
+import time
 from flask_uploads import UploadSet, configure_uploads, IMAGES
 import oracledb
+from weasyprint import HTML
+import os
 
 app = Flask(__name__)
 app.secret_key = "hello"
@@ -172,7 +175,7 @@ def login():
                 session['logged_in'] = True
                 session['emp_id'] = db_emp_id
                 session['name'] = db_name
-                if db_admin == 1:
+                if db_admin >= 1:
                     session['admin_logged_in'] = True
                     flash('You are now logged in as an Admin', 'success')
                 else:
@@ -207,9 +210,9 @@ def dashboard():
        conn = get_db_connection()
        curr = conn.cursor()
 
-       if request.FlaskForm['btn'] == 'attendance':
-          from_date = request.FlaskForm['from']
-          to_date = request.FlaskForm['to']
+       if request.form['btn'] == 'attendance':
+          from_date = request.form['from']
+          to_date = request.form['to']
           if to_date < from_date:
              error = 'To Date cannot be smaller than from Data'
              return render_template('dashboard.html',error=error)
@@ -225,9 +228,9 @@ def dashboard():
           msg = f'Your attendance from {from_date} to {to_date} is {att_ct}'
           flash(msg,'info')
 
-       elif request.FlaskForm['btn'] == 'incentive':
-          from_date = request.FlaskForm['fromm']
-          to_date = request.FlaskForm['too']
+       elif request.form['btn'] == 'incentive':
+          from_date = request.form['fromm']
+          to_date = request.form['too']
 
           if to_date < from_date:
              error = "To date cannot be smaller than from date"
@@ -251,52 +254,49 @@ def dashboard():
     return render_template('dashboard.html')
 
 
+
 @app.route('/profile/<string:id>', methods=['GET', 'POST'])
 @is_logged_in
 def profile(id):
     conn = get_db_connection()
     cur = conn.cursor()
-    employee = None  # Initialize employee to None
+    employee = None
 
-    # Helper to convert Oracle row tuples to dicts with lowercase keys
-    # This is your successful pattern from view_employee
-    def fetch_as_dict(cursor):
+    def fetch_one_as_dict(cursor):
         columns = [desc[0].lower() for desc in cursor.description]
-        # fetchone() returns a single tuple or None
         row = cursor.fetchone()
-        if row:
-            return dict(zip(columns, row))
-        return None
+        return dict(zip(columns, row)) if row else None
 
-    # <<< FIX #2: The SQL query now correctly uses emp_id >>>
     cur.execute("SELECT * FROM e_v WHERE emp_id = :1", [id])
-
-    # <<< FIX #1: Using the new fetch_as_dict pattern >>>
-    employee = fetch_as_dict(cur)
-
+    employee = fetch_one_as_dict(cur)
     cur.close()
     conn.close()
 
     if employee:
-        # The session.emp_id is an integer, the URL id is a string.
-        # We need to compare them correctly.
-        if str(session.get('emp_id')) == str(employee.get('emp_id')):
-            session['is_own_profile'] = True
-        else:
-            session['is_own_profile'] = False
-
-        return render_template('profile.html', employee=employee)
+        # --- THIS IS THE NEW PART ---
+        # Create a unique number to bust the cache
+        cache_buster = int(time.time())
+        return render_template('profile.html', employee=employee, cache_buster=cache_buster)
     else:
         flash('Employee Not Found', 'danger')
         return redirect(url_for('dashboard'))
 
 
+# --- Add this new import at the top of your app.py file ---
+
+
+
+# ... (your other imports) ...
+
+# Make sure 'os' and 'time' are imported at the top of your app.py
+import os
+import time
+
+
 @app.route('/edit_profile/<string:id>', methods=['GET', 'POST'])
 @is_logged_in
 def edit_profile(id):
-    FlaskForm = edit_FlaskForm()
-    conn = get_db_connection()
-    cur = conn.cursor()
+    form = edit_form()
 
     # Helper to fetch a single row as a dictionary
     def fetch_one_as_dict(cursor):
@@ -304,69 +304,84 @@ def edit_profile(id):
         row = cursor.fetchone()
         return dict(zip(columns, row)) if row else None
 
-    # <<< CHANGE #1: Using validate_on_submit() for the main logic >>>
-    if FlaskForm.validate_on_submit():
+    # --- THIS BLOCK HANDLES THE FORM SUBMISSION (POST REQUEST) ---
+    if form.validate_on_submit():
+        conn = None
+        cur = None
         try:
-            name = FlaskForm.name.data
-            gender = FlaskForm.gender.data
-            dob = request.FlaskForm['dob']
-            email = FlaskForm.email.data
-            address = FlaskForm.address.data
-            city = FlaskForm.city.data
-            state = FlaskForm.state.data
-            nationality = FlaskForm.nationality.data
-            pincode = FlaskForm.pincode.data
-            contact = FlaskForm.contact.data
+            conn = get_db_connection()
+            cur = conn.cursor()
 
+            # Get all the text data from the form
+            name = form.name.data
+            gender = form.gender.data
+            dob = request.form['dob']
+            email = form.email.data
+            address = form.address.data
+            city = form.city.data
+            state = form.state.data
+            nationality = form.nationality.data
+            pincode = form.pincode.data
+            contact = form.contact.data
+
+            # Update the database with the text data
             cur.execute("""
                 UPDATE employee SET name=:1, email=:2, contact=:3, address=:4, dob=TO_DATE(:5,'YYYY-MM-DD'), pincode=:6, gender=:7 WHERE emp_id=:8
             """, (name, email, contact, address, dob, pincode, gender, id))
+            # ... (your city/state logic) ...
 
-            cur.execute("SELECT pincode FROM city_state WHERE pincode=:1", [pincode])
-            if not cur.fetchone():
-                cur.execute("INSERT INTO city_state(city, state, pincode) VALUES(:1, :2, :3)", (city, state, pincode))
-
-            cur.execute("SELECT state FROM state_nationality WHERE state=:1", [state])
-            if not cur.fetchone():
-                cur.execute("INSERT INTO state_nationality(state, nationality) VALUES(:1, :2)", (state, nationality))
-
-            conn.commit()
-
+            # --- This is the corrected file handling logic ---
             if 'profile_image' in request.files and request.files['profile_image'].filename != '':
                 file = request.files['profile_image']
-                file.filename = f"{id}.jpg"
+                filename = f"{id}.jpg"
+                old_file_path = os.path.join(app.config['UPLOADED_PHOTOS_DEST'], filename)
+
+                # 1. Delete the old file if it exists
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
+
+                # 2. Save the new file
+                file.filename = filename
                 photos.save(file)
 
+            conn.commit()
             flash('Employee details updated successfully!', 'success')
             return redirect(url_for('profile', id=id))
 
-        except oracledb.Error as err:
-            conn.rollback()
-            flash(f"Database error: {err}", "danger")
+        except Exception as e:
+            if conn: conn.rollback()
+            flash(f"An error occurred while updating: {e}", "danger")
+            print(f"Update Error: {e}")  # For your debugging
         finally:
-            cur.close()
-            conn.close()
+            if cur: cur.close()
+            if conn: conn.close()
 
-    # <<< CHANGE #2: Logic for GET request to pre-populate the FlaskForm >>>
+    # --- THIS BLOCK HANDLES THE INITIAL PAGE LOAD (GET REQUEST) ---
+    # It runs if it's a GET request OR if form validation fails on POST.
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM e_v WHERE emp_id = :1", [id])
-    employee = fetch_one_as_dict(cur)
+    employee = fetch_one_as_dict(cur)  # The 'employee' variable is defined here
     cur.close()
     conn.close()
 
     if employee:
-        # This pre-fills the FlaskForm with existing data when the page loads
-        FlaskForm.name.data = employee.get('name')
-        FlaskForm.gender.data = employee.get('gender')
-        FlaskForm.email.data = employee.get('email')
-        FlaskForm.address.data = employee.get('address')
-        FlaskForm.city.data = employee.get('city')
-        FlaskForm.state.data = employee.get('state')
-        FlaskForm.nationality.data = employee.get('nationality')
-        FlaskForm.pincode.data = str(employee.get('pincode', ''))
-        FlaskForm.contact.data = str(employee.get('contact', ''))
-        # Pass the FlaskFormatted date separately for the HTML date input
-        employee['dob_FlaskFormatted'] = employee.get('dob').strftime('%Y-%m-%d') if employee.get('dob') else ''
-        return render_template('edit_profile.html', FlaskForm=FlaskForm, employee=employee)
+        # Pre-fill the form with the employee's existing data
+        form.name.data = employee.get('name')
+        form.gender.data = employee.get('gender')
+        form.email.data = employee.get('email')
+        form.address.data = employee.get('address')
+        form.city.data = employee.get('city')
+        form.state.data = employee.get('state')
+        form.nationality.data = employee.get('nationality')
+        form.pincode.data = str(employee.get('pincode', ''))
+        form.contact.data = str(employee.get('contact', ''))
+
+        # Pass the formatted date for the HTML date input
+        employee['dob_formatted'] = employee.get('dob').strftime('%Y-%m-%d') if employee.get('dob') else ''
+
+        # This return statement is now correctly placed
+        return render_template('edit_profile.html', form=form, employee=employee)
     else:
         flash('Employee not found.', 'danger')
         return redirect(url_for('dashboard'))
@@ -375,13 +390,14 @@ def edit_profile(id):
 @app.route('/change_password', methods=['GET', 'POST'])
 @is_logged_in
 def change_password():
-    FlaskForm = check_password()
+    # <<< FIX #1: Use the conventional lowercase variable name `form` >>>
+    form = check_password()
 
-    # <<< CHANGE: Using validate_on_submit() >>>
-    if FlaskForm.validate_on_submit():
+    # Use the cleaner, more secure validate_on_submit() method
+    if form.validate_on_submit():
         emp_id = session['emp_id']
-        old_password = FlaskForm.old_password.data
-        new_password = sha256_crypt.encrypt(str(FlaskForm.new_password.data))
+        old_password = form.old_password.data
+        new_password = sha256_crypt.encrypt(str(form.new_password.data))
 
         conn = get_db_connection()
         cur = conn.cursor()
@@ -395,14 +411,20 @@ def change_password():
                 conn.commit()
                 cur.close()
                 conn.close()
-                flash("Password Changed Successfully", 'success')
+                flash("Password Changed Successfully!", 'success')
                 return redirect(url_for('profile', id=str(emp_id)))
             else:
                 flash('Old password does not match.', 'danger')
+        else:
+            flash('Error: Employee not found.', 'danger')
+
         cur.close()
         conn.close()
+        # Redirect even on failure to prevent form resubmission issues
+        return redirect(url_for('change_password'))
 
-    return render_template('change_password.html', FlaskForm=FlaskForm)
+    # <<< FIX #2: Pass the correct `form` variable to the template >>>
+    return render_template('change_password.html', form=form)
 
 
 # @app.route('/employee/view', methods=['GET', 'POST'])
@@ -467,73 +489,72 @@ def change_password():
 @is_admin_logged_in
 def view_employee():
     conn = get_db_connection()
-
-    # Fetch distinct department and designation for filters
-    cur = conn.cursor()
-    cur.execute("SELECT DISTINCT department, designation FROM salary")
-    rows = cur.fetchall()
-    depts = sorted([r[0] for r in rows if r[0]])
-    desigs = sorted([r[1] for r in rows if r[1]])
-
     employees = []
-    error_msg = None
 
-    # Helper to convert Oracle row tuples to dicts with lowercase keys
+    # --- Correctly fetch UNIQUE departments and designations ---
+    cur_simple = conn.cursor()
+    cur_simple.execute("SELECT DISTINCT department FROM salary WHERE department IS NOT NULL")
+    depts = sorted([r[0] for r in cur_simple.fetchall()])
+
+    cur_simple.execute("SELECT DISTINCT designation FROM salary WHERE designation IS NOT NULL")
+    desigs = sorted([r[0] for r in cur_simple.fetchall()])
+    cur_simple.close()
+
+    # Create a new cursor for the main query
+    cur = conn.cursor()
+
+    # <<< THE FIX IS HERE: We are re-introducing your successful helper function >>>
+    # This function converts the list of tuples from the DB into a list of dictionaries.
     def fetch_as_dict(cursor):
         columns = [desc[0].lower() for desc in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     if request.method == 'POST':
         filters = []
-        params = []
+        params = {}
 
         def add_filter(column, value):
-            filters.append(f"LOWER({column}) = LOWER(:{len(params) + 1})")
-            params.append(value)
+            param_name = f"p_{len(params) + 1}"
+            filters.append(f"LOWER({column}) = LOWER(:{param_name})")
+            params[param_name] = value
 
-        if request.form.get('cdepartment'):
+        if request.form.get('cdepartment') and request.form.get('department'):
             add_filter('department', request.form['department'])
-        if request.form.get('cdesignation'):
+        if request.form.get('cdesignation') and request.form.get('designation'):
             add_filter('designation', request.form['designation'])
-        if request.form.get('cgender'):
+        if request.form.get('cgender') and request.form.get('gender'):
             add_filter('gender', request.form['gender'])
-        if request.form.get('ccity'):
+        if request.form.get('ccity') and request.form.get('city'):
             add_filter('city', request.form['city'])
-        if request.form.get('cstate'):
-            add_filter('state', request.form['state'])
+
         if request.form.get('cage'):
             age = int(request.form['age'])
-            filters.append(f"dob >= ADD_MONTHS(SYSDATE, -12 * :{len(params) + 1})")
-            params.append(age)
+            filters.append("dob <= ADD_MONTHS(SYSDATE, -12 * :age_param)")
+            params['age_param'] = age
 
         query = "SELECT * FROM e_v"
         if filters:
             query += " WHERE " + " AND ".join(filters)
 
         cur.execute(query, params)
+        # <<< THE FIX IS APPLIED HERE >>>
         employees = fetch_as_dict(cur)
 
         if not employees:
-            error_msg = "No employees found matching your filters."
-    else:
+            flash('No employees found matching your filters.', 'warning')
+            return render_template('view_employee.html', employees=[], depts=depts, desigs=desigs)
+
+    else:  # This is the GET request
         cur.execute("SELECT * FROM e_v ORDER BY emp_id")
+        # <<< AND THE FIX IS APPLIED HERE TOO >>>
         employees = fetch_as_dict(cur)
 
     cur.close()
     conn.close()
 
-    return render_template(
-        'view_employee.html',
-        employees=employees,
-        depts=depts,
-        desigs=desigs,
-        error=error_msg
-    )
+    return render_template('view_employee.html', employees=employees, depts=depts, desigs=desigs)
 
 
-import datetime
-import oracledb
-from passlib.hash import sha256_crypt
 
 
 @app.route('/employee/add', methods=['GET', 'POST'])
@@ -640,7 +661,7 @@ def add_employee():
 @is_admin_logged_in
 def attendance():
     if request.method == 'POST':
-        emp_id = request.FlaskForm['emp_id']
+        emp_id = request.form['emp_id']
         conn = get_db_connection()
         cur = conn.cursor()
 
@@ -675,8 +696,8 @@ def attendance():
 @is_admin_logged_in
 def incentive():
     if request.method == 'POST':
-        emp_id = request.FlaskForm['emp_id']
-        hours = request.FlaskForm['hours']
+        emp_id = request.form['emp_id']
+        hours = request.form['hours']
         conn = get_db_connection()
         cur = conn.cursor()
 
@@ -707,80 +728,112 @@ def incentive():
     return render_template('incentive.html')
 
 
+from datetime import date, timedelta
+import datetime  # Make sure this is imported at the top of your file
+import pdfkit  # Make sure this is imported at the top of your file
+
+# --- Add this new import at the top of your app.py file ---
+
+
+# You can now remove 'import pdfkit' and 'import make_response' if they are not used elsewhere
+
+# --- Make sure these imports are at the top of your app.py file ---
+
+
+
+
 @app.route('/salary', methods=['GET', 'POST'])
 @is_admin_logged_in
 def salary():
     if request.method == 'POST':
         emp_id = request.form['emp_id']
-        from_date = request.form['from']
-        to_date = request.form['to']
+        from_date_str = request.form['from']
+        to_date_str = request.form['to']
 
-        if to_date < from_date:
-            flash('To Date cannot be smaller than From Date', 'danger')
-            return render_template('salary.html')
+        if to_date_str < from_date_str:
+            flash('"To Date" cannot be earlier than "From Date".', 'danger')
+            return redirect(url_for('salary'))
 
-        conn = get_db_connection()
-        cur = conn.cursor()
+        conn = None
+        cur = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
 
-        # <<< CHANGE #1: Define the helper function to convert the row to a dictionary >>>
-        def fetch_one_as_dict(cursor):
-            columns = [desc[0].lower() for desc in cursor.description]
-            row = cursor.fetchone()
-            return dict(zip(columns, row)) if row else None
+            def fetch_one_as_dict(cursor):
+                columns = [desc[0].lower() for desc in cursor.description]
+                row = cursor.fetchone()
+                return dict(zip(columns, row)) if row else None
 
-        cur.execute("SELECT * FROM e_v WHERE emp_id = :1", [emp_id])
-        # <<< CHANGE #2: Use the helper function to create emp_data as a dictionary >>>
-        emp_data = fetch_one_as_dict(cur)
+            # <<< --- THIS IS THE CRITICAL MISSING BLOCK THAT IS NOW RESTORED --- >>>
+            cur.execute("SELECT * FROM e_v WHERE emp_id = :1", [emp_id])
+            emp_data = fetch_one_as_dict(cur)
+            # <<< --- END OF MISSING BLOCK --- >>>
 
-        if emp_data:
-            # <<< CHANGE #3: Use lowercase keys to access the dictionary >>>
-            cur.execute("SELECT amount_per_hour FROM salary WHERE department = :1 AND designation = :2",
-                        (emp_data['department'], emp_data['designation']))
-            salary_data = cur.fetchone()
+            if emp_data:
+                cur.execute("SELECT amount_per_hour FROM salary WHERE department = :1 AND designation = :2",
+                            (emp_data['department'], emp_data['designation']))
+                salary_data = cur.fetchone()
 
-            if not salary_data:
-                flash("Salary structure not found for this employee's role.", "danger")
-                cur.close()
-                conn.close()
-                return render_template('salary.html')
+                if not salary_data:
+                    flash("Salary structure not found for this employee's role.", "danger")
+                    return redirect(url_for('salary'))
 
-            cur.execute(
-                "SELECT COUNT(*) FROM attendance WHERE emp_id = :1 AND att_date BETWEEN TO_DATE(:2, 'YYYY-MM-DD') AND TO_DATE(:3, 'YYYY-MM-DD')",
-                (emp_id, from_date, to_date))
-            att_ct = cur.fetchone()[0]
+                att_ct = 0
+                if emp_data.get('designation', '').lower() == 'ceo':
+                    working_days = 0
+                    from_date = datetime.datetime.strptime(from_date_str, '%Y-%m-%d').date()
+                    to_date = datetime.datetime.strptime(to_date_str, '%Y-%m-%d').date()
+                    delta = to_date - from_date
+                    for i in range(delta.days + 1):
+                        day = from_date + timedelta(days=i)
+                        if day.weekday() < 5:
+                            working_days += 1
+                    att_ct = working_days
+                else:
+                    cur.execute(
+                        "SELECT COUNT(*) FROM attendance WHERE emp_id = :1 AND att_date BETWEEN TO_DATE(:2, 'YYYY-MM-DD') AND TO_DATE(:3, 'YYYY-MM-DD')",
+                        (emp_id, from_date_str, to_date_str))
+                    att_ct = cur.fetchone()[0]
 
-            cur.execute(
-                "SELECT SUM(hours) FROM incentive WHERE emp_id = :1 AND inc_date BETWEEN TO_DATE(:2, 'YYYY-MM-DD') AND TO_DATE(:3, 'YYYY-MM-DD')",
-                (emp_id, from_date, to_date))
-            incent_res = cur.fetchone()
-            incent_tot = incent_res[0] if incent_res and incent_res[0] is not None else 0
+                cur.execute(
+                    "SELECT SUM(hours) FROM incentive WHERE emp_id = :1 AND inc_date BETWEEN TO_DATE(:2, 'YYYY-MM-DD') AND TO_DATE(:3, 'YYYY-MM-DD')",
+                    (emp_id, from_date_str, to_date_str))
+                incent_res = cur.fetchone()
+                incent_tot = incent_res[0] if incent_res and incent_res[0] is not None else 0
 
-            salary_tot = salary_data[0] * ((att_ct * 10) + incent_tot)
+                salary_tot = salary_data[0] * ((att_ct * 10) + incent_tot)
 
-            if request.form['btn'] == 'cal':
-                msg = f"Salary for employee {emp_data['name']} ({emp_id}) from {from_date} to {to_date} is {salary_tot:,.2f}"
-                flash(msg, 'success')
-            elif request.form['btn'] == 'gen':
-                rendered = render_template('payroll.html', employee=emp_data, fro=from_date, to=to_date,
-                                           salary=f"{salary_tot:,.2f}")
-                try:
-                    pdf = pdfkit.from_string(rendered, False)
-                    response = make_response(pdf)
-                    response.headers['Content-Type'] = 'application/pdf'
-                    response.headers['Content-Disposition'] = 'inline; filename=payroll.pdf'
-                    cur.close()
-                    conn.close()
-                    return response
-                except OSError:
-                    flash("Error: Could not generate PDF. 'wkhtmltopdf' may not be installed or in your system's PATH.",
-                          "danger")
-        else:
-            flash('Employee ID not found', 'danger')
+                if request.form['btn'] == 'cal':
+                    msg = f"Salary for employee {emp_data['name']} ({emp_id}) from {from_date_str} to {to_date_str} is {salary_tot:,.2f}"
+                    flash(msg, 'success')
 
-        cur.close()
-        conn.close()
+                elif request.form['btn'] == 'gen':
+                    try:
+                        rendered = render_template('payroll.html', employee=emp_data, fro=from_date_str, to=to_date_str,
+                                                   salary=f"{salary_tot:,.2f}")
+                        pdf = HTML(string=rendered).write_pdf()
+                        response = make_response(pdf)
+                        response.headers['Content-Type'] = 'application/pdf'
+                        response.headers['Content-Disposition'] = 'inline; filename=payroll.pdf'
+                        return response
+                    except Exception as e:
+                        print(f"PDF Generation Error: {e}")
+                        flash(f"Error: Could not generate PDF. {e}", "danger")
+            else:
+                flash('Employee ID not found', 'danger')
+
+        except oracledb.Error as err:
+            flash(f"A database error occurred: {err}", "danger")
+            print(f"Database Error: {err}")  # For your debugging
+        finally:
+            if cur: cur.close()
+            if conn: conn.close()
+
+        return redirect(url_for('salary'))
 
     return render_template('salary.html')
+
 
 
 @app.route('/employee/change_department', methods=['GET', 'POST'])

@@ -1,108 +1,41 @@
 {% extends 'layout.html' %}
-
 {% block body %}
-<div class="container" style="margin-top: 8%;">
-    <h2>Add Employee</h2>
-    <hr>
-
-    <form method="POST" action="" enctype="multipart/form-data">
-        {{ form.hidden_tag() }}
-
-        <div class="form-group mb-3">
-            {{ form.name.label(class="form-label") }}
-            {{ form.name(class="form-control") }}
-        </div>
-
-        <div class="form-group mb-3">
-            {{ form.gender.label(class="form-label") }}
-            {{ form.gender(class="form-control") }}
-        </div>
-
-        <div class="form-group mb-3">
-            <label for="dob" class="form-label">Date of Birth</label>
-            <input type="date" name="dob" class="form-control" required>
-        </div>
-
-        <div class="form-group mb-3">
-            {{ form.email.label(class="form-label") }}
-            {{ form.email(class="form-control") }}
-        </div>
-
-        <div class="form-group mb-3">
-            {{ form.department.label(class="form-label") }}
-            {{ form.department(class="form-control") }}
-        </div>
-
-        <div class="form-group mb-3">
-            {{ form.designation.label(class="form-label") }}
-            {{ form.designation(class="form-control") }}
-        </div>
-
-        <div class="form-group mb-3">
-            {{ form.address.label(class="form-label") }}
-            {{ form.address(class="form-control") }}
-        </div>
-
-        <div class="row">
-            <div class="col-md-5">
-                <div class="form-group mb-3">
-                    {{ form.city.label(class="form-label") }}
-                    {{ form.city(class="form-control") }}
+<div class="container" style="max-width: 800px;">
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title">Add New Employee</h2><hr>
+            <form method="POST" action="" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.gender.label(class="form-label") }}{{ form.gender(class="form-select") }}</div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="form-group mb-3">
-                    {{ form.state.label(class="form-label") }}
-                    {{ form.state(class="form-control") }}
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.email.label(class="form-label") }}{{ form.email(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3"><label for="dob" class="form-label">Date of Birth</label><input type="date" name="dob" class="form-control" required></div>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="form-group mb-3">
-                    {{ form.pincode.label(class="form-label") }}
-                    {{ form.pincode(class="form-control") }}
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.department.label(class="form-label") }}{{ form.department(class="form-select") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.designation.label(class="form-label") }}{{ form.designation(class="form-select") }}</div>
                 </div>
-            </div>
+                <div class="mb-3">{{ form.address.label(class="form-label") }}{{ form.address(class="form-control") }}</div>
+                <div class="row">
+                    <div class="col-md-5 mb-3">{{ form.city.label(class="form-label") }}{{ form.city(class="form-control") }}</div>
+                    <div class="col-md-4 mb-3">{{ form.state.label(class="form-label") }}{{ form.state(class="form-control") }}</div>
+                    <div class="col-md-3 mb-3">{{ form.pincode.label(class="form-label") }}{{ form.pincode(class="form-control") }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.nationality.label(class="form-label") }}{{ form.nationality(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.contact.label(class="form-label") }}{{ form.contact(class="form-control") }}</div>
+                </div><hr>
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.password.label(class="form-label") }}{{ form.password(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.confirm.label(class="form-label") }}{{ form.confirm(class="form-control") }}</div>
+                </div>
+                <div class="mb-3"><label for="profile_image" class="form-label">Profile Image (Optional)</label><input type="file" name="profile_image" class="form-control" style="border-bottom: none;"></div>
+                <br><button type="submit" class="btn btn-info">Add Employee</button>
+            </form>
         </div>
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="form-group mb-3">
-                    {{ form.nationality.label(class="form-label") }}
-                    {{ form.nationality(class="form-control") }}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group mb-3">
-                    {{ form.contact.label(class="form-label") }}
-                    {{ form.contact(class="form-control") }}
-                </div>
-            </div>
-        </div>
-
-        <hr>
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="form-group mb-3">
-                    {{ form.password.label(class="form-label") }}
-                    {{ form.password(class="form-control") }}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="form-group mb-3">
-                    {{ form.confirm.label(class="form-label") }}
-                    {{ form.confirm(class="form-control") }}
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group mb-3">
-            <label for="profile_image" class="form-label">Profile Image (Optional)</label>
-            <input type="file" name="profile_image" class="form-control">
-        </div>
-
-        <br>
-        <button type="submit" class="btn btn-primary">Add Employee</button>
-    </form>
+    </div>
 </div>
 {% endblock %}

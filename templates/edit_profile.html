@@ -1,52 +1,35 @@
 {% extends 'layout.html' %}
 
 {% block body %}
+<div class="container" style="max-width: 800px;">
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title">Edit Profile for {{ employee.name }}</h2><hr>
 
-
-	{% from "includes/_formhelpers.html" import render_field %}
-    <div style="margin-top:8%;">
-    	<h1 align="center"> Edit Profile </h1>
-	    <form method="POST" action="" enctype="multipart/form-data">
-			{{ form.hidden_tag() }}
-	        <div class="form-group">
-	            {{ render_field(form.name, class_="form-control" , value=employee.name) }}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.gender, class_="form-control",  value=employee.gender) }}
-	        </div>
-	        <div>
-        		<label for="from" style="font-size: 20px;">Date of Birth</label>
-         		<input type="date" class="form-control" name="dob" max="3000-12-31" min="1000-01-01" placeholder='From' style="width:100%;" value = '{{employee.dob}}'>
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.email, class_="form-control",  value=employee.email) }}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.address, class_="form-control" , value=employee.address) }}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.city, class_="form-control" , value=employee.city) }}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.state, class_="form-control" , value=employee.state) }}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.nationality, class_="form-control" , value=employee.nationality) }}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.pincode, class_="form-control" , value=employee.pincode)}}
-	        </div>
-	        <div class="form-group">
-	            {{ render_field(form.contact, class_="form-control" , value=employee.contact) }}
-	        </div>
-
-	        <div>
-	        	<label for="profile_image">Profile Image</label></br>
-	            <input type="file" name="profile_image">
-	        </div>
-	        <p align =center></br><input type="submit" class="btn btn-primary" value="Submit"></p>
-	    </form>
-	</div>
-
-
+            <form method="POST" action="" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.gender.label(class="form-label") }}{{ form.gender(class="form-select") }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.email.label(class="form-label") }}{{ form.email(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3"><label for="dob" class="form-label">Date of Birth</label><input type="date" name="dob" class="form-control" value="{{ employee.dob_formatted }}" required></div>
+                </div>
+                <div class="mb-3">{{ form.address.label(class="form-label") }}{{ form.address(class="form-control") }}</div>
+                <div class="row">
+                    <div class="col-md-5 mb-3">{{ form.city.label(class="form-label") }}{{ form.city(class="form-control") }}</div>
+                    <div class="col-md-4 mb-3">{{ form.state.label(class="form-label") }}{{ form.state(class="form-control") }}</div>
+                    <div class="col-md-3 mb-3">{{ form.pincode.label(class="form-label") }}{{ form.pincode(class="form-control") }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">{{ form.nationality.label(class="form-label") }}{{ form.nationality(class="form-control") }}</div>
+                    <div class="col-md-6 mb-3">{{ form.contact.label(class="form-label") }}{{ form.contact(class="form-control") }}</div>
+                </div><hr>
+                <div class="mb-3"><label for="profile_image" class="form-label">Change Profile Image (Optional)</label><input type="file" name="profile_image" class="form-control" style="border-bottom: none;"></div>
+                <br><button type="submit" class="btn btn-info">Update Profile</button>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

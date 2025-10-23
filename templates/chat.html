@@ -1,0 +1,118 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+{# Link your chat.css file here if it's not in layout.html #}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+
+<div class="chat-container">
+    <h2 class="chat-title">Company Chat</h2>
+    <div class="chat-box" id="chat-box">
+        <!-- Chat history and live messages appear here -->
+    </div>
+    <div class="chat-form-container">
+        <form id="chat-form" class="chat-form">
+            <div class="input-group">
+                <select class="form-select user-select" id="recipient-select" required>
+                    <option value="" disabled selected>Select Recipient</option>
+                    {% for emp in employee_list %}
+                        <option value="{{ emp.emp_id }}">
+                            {{ emp.name }} {% if emp.emp_id == session.emp_id %}(Yourself){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                <input type="text" id="message-input" class="form-control" placeholder="Type your message..." autocomplete="off" required>
+                <button class="btn btn-info send-btn" type="submit">Send</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+    const myEmpId = {{ session.emp_id | tojson }};
+    const socket = io();
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const chatBox = document.getElementById('chat-box');
+    const recipientSelect = document.getElementById('recipient-select');
+
+    // Function to display a message
+
+    function displayMessage(data) {
+        const messageElement = document.createElement('div');
+        let title = `<strong>${data.sender_name || 'Unknown'}:</strong>`;
+        let divClasses = ['chat-message'];
+
+        if (data.sender_id === myEmpId) {
+            let recipientName = data.recipient_name || `User ${data.recipient_id}`;
+            title = `<strong>You (to ${data.recipient_id === myEmpId ? 'Yourself' : recipientName}):</strong>`;
+            divClasses.push('sent', 'text-end', 'ms-auto');
+            messageElement.style.maxWidth = '75%';
+            messageElement.style.backgroundColor = '#d1e7dd';
+        } else {
+             title = `<strong>${data.sender_name}:</strong>`;
+             divClasses.push('received');
+             messageElement.style.maxWidth = '75%';
+             messageElement.style.backgroundColor = '#f8f9fa';
+        }
+
+        if (data.type === 'system') {
+            title = `<strong>System:</strong>`;
+            divClasses.push('system');
+            messageElement.style.maxWidth = '100%';
+            messageElement.style.backgroundColor = '#fff3cd';
+        }
+
+        messageElement.classList.add(...divClasses, 'p-2', 'mb-2');
+        const messageContent = data.message_text || data.msg || '';
+        const sanitizedContent = messageContent.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        messageElement.innerHTML = `${title} ${sanitizedContent}`;
+        chatBox.appendChild(messageElement);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+<!--    // -&#45;&#45; LOAD HISTORY ON PAGE LOAD -&#45;&#45;-->
+<!--    const chatHistory = {{ chat_history | tojson }};-->
+<!--    console.log("Chat history from server:", chatHistory);-->
+<!--    if (chatHistory && chatHistory.length > 0) {-->
+<!--        chatHistory.forEach(displayMessage);-->
+<!--    } else {-->
+<!--        console.log("No relevant chat history found.");-->
+<!--    }-->
+<!--    chatBox.scrollTop = chatBox.scrollHeight;-->
+
+    // --- SOCKET.IO EVENT LISTENERS ---
+    socket.on('connect', () => console.log('Connected!'));
+    socket.on('disconnect', () => console.log('Disconnected!'));
+    socket.on('message', displayMessage);
+
+    // --- LOAD HISTORY WHEN SENT FROM SERVER ON CONNECT ---
+socket.on('load_history', function(messages) {
+    console.log("Received chat history from server:", messages);
+    chatBox.innerHTML = ""; // clear current messages
+    if (messages && messages.length > 0) {
+        messages.forEach(displayMessage);
+    } else {
+        const info = document.createElement("div");
+        info.textContent = "No previous messages found.";
+        info.classList.add("text-muted", "fst-italic", "p-2");
+        chatBox.appendChild(info);
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
+});
+
+    // Handle form submission
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const message = messageInput.value;
+        const targetId = recipientSelect.value;
+        if (message.trim() && targetId) {
+            socket.emit('message', { msg: message, target_id: targetId });
+            messageInput.value = '';
+            messageInput.focus();
+        } else if (!targetId) {
+             alert('Please select a recipient.');
+        }
+    });
+</script>
+{% endblock %}

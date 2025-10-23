@@ -58,6 +58,7 @@
                 {% if session.logged_in %}
                     <ul class="navbar-nav me-auto mb-2 mb-md-0">
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('chat') }}">Chat</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('about') }}">About</a></li>
 
                         {% if session.admin_logged_in %}
@@ -98,7 +99,7 @@
 
     <!-- Footer -->
     <footer>
-        <p>© {{ current_year if current_year else "2025" }} HR Management System. All rights reserved.</p>
+    <p>© {{ current_year }} HR Management System. All rights reserved.</p>
     </footer>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

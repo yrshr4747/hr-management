@@ -166,4 +166,43 @@ SET password = '$5$rounds=535000$2lEixgnOGFkICeBH$GALm0I0vqSZYtwFzF8K1TLyunV5P4E
 WHERE emp_id = 2;
 commit;
 
+CREATE TABLE chat_messages (
+    message_id NUMBER PRIMARY KEY,
+    sender_id NUMBER NOT NULL,
+    recipient_id NUMBER, -- NULL for public messages
+    message_text VARCHAR2(1000) NOT NULL,
+    sent_at TIMESTAMP DEFAULT SYSTIMESTAMP,
+    CONSTRAINT fk_chat_sender FOREIGN KEY (sender_id) REFERENCES employee(emp_id),
+    CONSTRAINT fk_chat_recipient FOREIGN KEY (recipient_id) REFERENCES employee(emp_id)
+);
+
+CREATE SEQUENCE chat_message_seq START WITH 1 INCREMENT BY 1;
+
+CREATE OR REPLACE TRIGGER chat_message_bi
+BEFORE INSERT ON chat_messages
+FOR EACH ROW
+BEGIN
+   -- Check if the message_id is being provided explicitly (it shouldn't be from Python)
+   -- Or if it's NULL (meaning we need to generate it)
+   IF :NEW.message_id IS NULL THEN
+      -- Get the next value from the sequence and assign it
+      SELECT chat_message_seq.NEXTVAL INTO :NEW.message_id FROM dual;
+   END IF;
+END;
+/
+
+-- Ensure the trigger is enabled (usually default, but good to check)
+ALTER TRIGGER chat_message_bi ENABLE;
+COMMIT;
+
+ALTER TABLE chat_messages ADD (message_type VARCHAR2(20) DEFAULT 'public');
+commit;
+
 select * from employee;
+
+ALTER TABLE chat_messages ADD (message_type VARCHAR2(20) DEFAULT 'public');
+COMMIT;
+
+SELECT message_id, sender_id, recipient_id, message_text, sent_at
+FROM chat_messages
+ORDER BY sent_at DESC;

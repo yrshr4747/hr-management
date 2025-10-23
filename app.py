@@ -13,10 +13,13 @@ from flask_uploads import UploadSet, configure_uploads, IMAGES
 import oracledb
 from weasyprint import HTML
 import os
+from flask_socketio import SocketIO, emit,join_room,leave_room
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 app.secret_key = "hello"
 app.permanent_session_lifetime = timedelta(minutes=10)
+user_sids = {}
 
 #oracledb
 def get_db_connection():
@@ -143,10 +146,11 @@ class upd_sal(FlaskForm):
 
 @app.route('/')
 def index():
-	if session.get('logged_in'):
-		return redirect(url_for('dashboard'))
-	else:
-		return redirect(url_for('login'))
+    if session.get('logged_in'):
+       return redirect(url_for('dashboard'))
+    else:
+       return redirect(url_for('login'))
+
 
 @app.route('/register')
 def register():
@@ -304,7 +308,7 @@ def edit_profile(id):
         row = cursor.fetchone()
         return dict(zip(columns, row)) if row else None
 
-    # --- THIS BLOCK HANDLES THE FORM SUBMISSION (POST REQUEST) ---
+    # This block handles the form submission (POST request)
     if form.validate_on_submit():
         conn = None
         cur = None
@@ -324,23 +328,32 @@ def edit_profile(id):
             pincode = form.pincode.data
             contact = form.contact.data
 
-            # Update the database with the text data
+            # Update the main employee table
             cur.execute("""
                 UPDATE employee SET name=:1, email=:2, contact=:3, address=:4, dob=TO_DATE(:5,'YYYY-MM-DD'), pincode=:6, gender=:7 WHERE emp_id=:8
             """, (name, email, contact, address, dob, pincode, gender, id))
-            # ... (your city/state logic) ...
 
-            # --- This is the corrected file handling logic ---
+            # --- THIS IS THE CORRECTED AND COMPLETE CITY/STATE LOGIC ---
+            cur.execute("SELECT pincode FROM city_state WHERE pincode=:1", [pincode])
+            if not cur.fetchone():
+                # If the pincode is new, insert a new record
+                cur.execute("INSERT INTO city_state(city, state, pincode) VALUES(:1, :2, :3)", (city, state, pincode))
+            else:
+                # If the pincode already exists, update its city and state
+                cur.execute("UPDATE city_state SET city = :1, state = :2 WHERE pincode = :3", (city, state, pincode))
+
+            # Logic for state_nationality table
+            cur.execute("SELECT state FROM state_nationality WHERE state=:1", [state])
+            if not cur.fetchone():
+                cur.execute("INSERT INTO state_nationality(state, nationality) VALUES(:1, :2)", (state, nationality))
+
+            # File handling logic
             if 'profile_image' in request.files and request.files['profile_image'].filename != '':
                 file = request.files['profile_image']
                 filename = f"{id}.jpg"
                 old_file_path = os.path.join(app.config['UPLOADED_PHOTOS_DEST'], filename)
-
-                # 1. Delete the old file if it exists
                 if os.path.exists(old_file_path):
                     os.remove(old_file_path)
-
-                # 2. Save the new file
                 file.filename = filename
                 photos.save(file)
 
@@ -351,22 +364,21 @@ def edit_profile(id):
         except Exception as e:
             if conn: conn.rollback()
             flash(f"An error occurred while updating: {e}", "danger")
-            print(f"Update Error: {e}")  # For your debugging
+            print(f"Update Error: {e}")
         finally:
             if cur: cur.close()
             if conn: conn.close()
 
-    # --- THIS BLOCK HANDLES THE INITIAL PAGE LOAD (GET REQUEST) ---
-    # It runs if it's a GET request OR if form validation fails on POST.
+    # This block handles the initial page load (GET request)
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM e_v WHERE emp_id = :1", [id])
-    employee = fetch_one_as_dict(cur)  # The 'employee' variable is defined here
+    employee = fetch_one_as_dict(cur)
     cur.close()
     conn.close()
 
     if employee:
-        # Pre-fill the form with the employee's existing data
+        # Pre-fill the form with existing data
         form.name.data = employee.get('name')
         form.gender.data = employee.get('gender')
         form.email.data = employee.get('email')
@@ -376,11 +388,7 @@ def edit_profile(id):
         form.nationality.data = employee.get('nationality')
         form.pincode.data = str(employee.get('pincode', ''))
         form.contact.data = str(employee.get('contact', ''))
-
-        # Pass the formatted date for the HTML date input
         employee['dob_formatted'] = employee.get('dob').strftime('%Y-%m-%d') if employee.get('dob') else ''
-
-        # This return statement is now correctly placed
         return render_template('edit_profile.html', form=form, employee=employee)
     else:
         flash('Employee not found.', 'danger')
@@ -427,62 +435,6 @@ def change_password():
     return render_template('change_password.html', form=form)
 
 
-# @app.route('/employee/view', methods=['GET', 'POST'])
-# @is_admin_logged_in
-# def view_employee():
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     cur.execute("SELECT department, designation FROM salary")
-#     rows = cur.fetchall()
-#     depts = sorted(list(set(r[0] for r in rows if r[0])))
-#     desigs = sorted(list(set(r[1] for r in rows if r[1])))
-#
-#     # Use the rowfactory for dictionary results
-#     cur.rowfactory = lambda *args: dict(zip([d[0].lower() for d in cur.description], args))
-#
-#     if request.method == 'POST':
-#         filters = []
-#         params = []
-#         param_idx = 1
-#
-#         def add_filter(field, value):
-#             nonlocal param_idx
-#             filters.append(f"{field} = :{param_idx}")
-#             params.append(value)
-#             param_idx += 1
-#
-#         if request.FlaskForm.get('cdepartment'): add_filter('department', request.FlaskForm['department'])
-#         if request.FlaskForm.get('cdesignation'): add_filter('designation', request.FlaskForm['designation'])
-#         if request.FlaskForm.get('cgender'): add_filter('gender', request.FlaskForm['gender'])
-#         if request.FlaskForm.get('ccity'): add_filter('city', request.FlaskForm['city'])
-#         if request.FlaskForm.get('cstate'): add_filter('state', request.FlaskForm['state'])
-#
-#         if request.FlaskForm.get('cage'):
-#             age = int(request.FlaskForm['age'])
-#             filters.append(f"dob >= ADD_MONTHS(SYSDATE, -12 * :{param_idx})")
-#             params.append(age)
-#             param_idx += 1
-#
-#         query = "SELECT * FROM e_v"
-#         if filters:
-#             query += " WHERE " + " AND ".join(filters)
-#
-#         cur.execute(query, params)
-#         employees = cur.fetchall()
-#
-#         if not employees:
-#             flash('No employees found matching your filters.', 'warning')
-#
-#     else:  # This is the GET request (first page load)
-#         # Fetch ALL employees by default
-#         cur.execute("SELECT * FROM e_v ORDER BY emp_id")  # <<< THE FIX IS HERE
-#         employees = cur.fetchall()
-#
-#     cur.close()
-#     conn.close()
-#
-#     return render_template('view_employee.html', employees=employees, depts=depts, desigs=desigs)
 
 
 @app.route('/employee/view', methods=['GET', 'POST'])
@@ -839,41 +791,59 @@ def salary():
 @app.route('/employee/change_department', methods=['GET', 'POST'])
 @is_admin_logged_in
 def change_department():
-    FlaskForm = change_dep(request.FlaskForm)
+    # <<< FIX #1: Instantiate the form correctly (no request.form needed) >>>
+    # <<< FIX #2: Use the conventional lowercase variable name `form` >>>
+    form = change_dep()
     conn = get_db_connection()
     cur_ = conn.cursor()
 
-    cur_.execute("SELECT department, designation FROM salary")
+    # --- This logic populates the dropdowns and needs to run for GET and POST ---
+    cur_.execute("SELECT DISTINCT department, designation FROM salary")
     rows = cur_.fetchall()
     depts = sorted(list(set(r[0] for r in rows if r[0])))
     desigs = sorted(list(set(r[1] for r in rows if r[1])))
-    FlaskForm.department.choices = [('', '')] + [(d, d) for d in depts]
-    FlaskForm.designation.choices = [('', '')] + [(d, d) for d in desigs]
+    # <<< FIX #2: Use the correct variable name `form` >>>
+    form.department.choices = [('', 'Select Department')] + [(d, d) for d in depts]
+    form.designation.choices = [('', 'Select Designation')] + [(d, d) for d in desigs]
     cur_.close()
 
-    if request.method == 'POST' and FlaskForm.validate():
-        emp_id, department, designation = FlaskForm.emp_id.data, FlaskForm.department.data, FlaskForm.designation.data
+    # <<< FIX #3: Use the validate_on_submit() method >>>
+    if form.validate_on_submit():
+        emp_id = form.emp_id.data
+        department = form.department.data
+        designation = form.designation.data
+
         cur = conn.cursor()
-        result = cur.execute("SELECT emp_id FROM employee WHERE emp_id = :1", [emp_id])
-        if result.fetchone():
-            cur.execute("UPDATE employee SET designation = :1, department = :2 WHERE emp_id=:3",
-                        (designation, department, emp_id))
-            conn.commit()
-            flash('Employee details updated successfully.', 'success')
+        cur.execute("SELECT emp_id FROM employee WHERE emp_id = :1", [emp_id])
+        if cur.fetchone():
+            # Check if the new combination is valid
+            cur.execute("SELECT designation FROM salary WHERE department=:1", [department])
+            valid_desigs = [r[0] for r in cur.fetchall()]
+            if designation in valid_desigs:
+                cur.execute("UPDATE employee SET designation = :1, department = :2 WHERE emp_id = :3",
+                            (designation, department, emp_id))
+                conn.commit()
+                flash(f"Employee {emp_id}'s department and designation updated successfully.", 'success')
+            else:
+                flash('Invalid Department/Designation combination.', 'danger')
         else:
-            flash('Employee id not found', 'danger')
+            flash('Employee ID not found.', 'danger')
+
         cur.close()
         conn.close()
+        # Redirect after processing the POST request
         return redirect(url_for('change_department'))
 
+    # This handles the GET request (initial page load)
     conn.close()
-    return render_template('change_department.html', FlaskForm=FlaskForm)
+    # <<< FIX #4: Pass the correct `form` variable to the template >>>
+    return render_template('change_department.html', form=form)
 
 
 @app.route('/hierarchy', methods=['GET', 'POST'])
-@is_admin_logged_in  # Changed from is_logged_in for consistency
+@is_admin_logged_in
 def hierarchy():
-    # <<< CHANGE: Instantiate all FlaskForms without request.FlaskForm >>>
+    # Instantiate all FlaskForms without request.form
     form1 = add_dep()
     form2 = add_des()
     form3 = upd_sal()
@@ -881,6 +851,7 @@ def hierarchy():
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # --- This logic populates the dropdowns ---
     cur.execute("SELECT DISTINCT department, designation FROM salary")
     rows = cur.fetchall()
     depts = sorted(list(set(r[0] for r in rows if r[0])))
@@ -889,35 +860,59 @@ def hierarchy():
     form3.department.choices = [('', 'Select Department')] + [(i, i) for i in depts]
     form3.designation.choices = [('', 'Select Designation')] + [(i, i) for i in desigs]
 
-    # <<< CHANGE: We stick with this logic for multiple FlaskForms >>>
+    # --- This logic handles the POST request ---
     if request.method == 'POST':
         btn_action = request.form.get('btn')
+        action_successful = False # Flag to track if any action was successful
 
-        # <<< CHANGE: Validate each FlaskForm individually >>>
+        # Validate each form individually based on which button was pressed
         if btn_action == 'form1' and form1.validate():
-            cur.execute("INSERT INTO salary(department,designation,amount_per_hour) VALUES(:1, :2, :3)",
-                        (form1.department.data, form1.designation.data, int(form1.salary.data)))
-            flash('New Department and Designation added.', 'success')
-            conn.commit()
+            try:
+                cur.execute("INSERT INTO salary(department,designation,amount_per_hour) VALUES(:1, :2, :3)",
+                            (form1.department.data, form1.designation.data, int(form1.salary.data)))
+                conn.commit()
+                flash('New Department and Designation added.', 'success')
+                action_successful = True
+            except oracledb.Error as e:
+                conn.rollback()
+                flash(f"Error adding Department/Designation: {e}", "danger")
+
         elif btn_action == 'form2' and form2.validate():
-            cur.execute("INSERT INTO salary(department,designation,amount_per_hour) VALUES(:1, :2, :3)",
-                        (form2.department.data, form2.designation.data, int(form2.salary.data)))
-            flash('New Designation added to existing Department.', 'success')
-            conn.commit()
+            try:
+                cur.execute("INSERT INTO salary(department,designation,amount_per_hour) VALUES(:1, :2, :3)",
+                            (form2.department.data, form2.designation.data, int(form2.salary.data)))
+                conn.commit()
+                flash('New Designation added to existing Department.', 'success')
+                action_successful = True
+            except oracledb.Error as e:
+                conn.rollback()
+                flash(f"Error adding Designation: {e}", "danger")
+
         elif btn_action == 'form3' and form3.validate():
-            cur.execute("UPDATE salary SET amount_per_hour=:1 WHERE department=:2 AND designation=:3",
-                        (int(form3.salary.data), form3.department.data, form3.designation.data))
-            flash('Salary updated successfully.', 'success')
-            conn.commit()
+            try:
+                cur.execute("UPDATE salary SET amount_per_hour=:1 WHERE department=:2 AND designation=:3",
+                            (int(form3.salary.data), form3.department.data, form3.designation.data))
+                conn.commit()
+                flash('Salary updated successfully.', 'success')
+                action_successful = True
+            except oracledb.Error as e:
+                conn.rollback()
+                flash(f"Error updating Salary: {e}", "danger")
+        else:
+             # Handle validation errors if a button was pressed but form invalid
+             if btn_action in ['form1', 'form2', 'form3']:
+                 flash('Please correct the errors in the form and try again.', 'danger')
 
         cur.close()
         conn.close()
-        return redirect(url_for('hierarchy'))
+        # Redirect only if an action was attempted (to prevent losing error messages)
+        if btn_action:
+             return redirect(url_for('hierarchy'))
 
+    # --- This handles the GET request (initial page load) ---
     cur.close()
     conn.close()
     return render_template('hierarchy.html', form1=form1, form2=form2, form3=form3)
-
 
 @app.route('/make_admin/<string:id>', methods=['POST'])
 @is_admin_logged_in
@@ -958,13 +953,232 @@ def del_emp(id):
     conn.close()
     return jsonify({"message": "done"}), 200
 
+# Add this new route anywhere in your app.py
+@app.route('/get_designations/<string:department_name>')
+@is_admin_logged_in # Protect the endpoint
+def get_designations(department_name):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT designation FROM salary WHERE department = :1 AND designation IS NOT NULL ORDER BY designation", [department_name])
+    # Fetch all rows and extract the first element (designation) from each tuple
+    designations = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return jsonify(designations) # Return the list as JSON
+
+@app.context_processor
+def inject_current_year():
+    return {'current_year': datetime.date.today().year}
 
 
+# --- Helper Function (Ensure fetch_all_as_dict is defined) ---
+def fetch_all_as_dict(cursor):
+    if not cursor.description: return []
+    columns = [desc[0].lower() for desc in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
+# --- Chat Route (Loads relevant history and employee list) ---
+@app.route('/chat')
+@is_logged_in
+def chat():
+    emp_id = session['emp_id']
+    conn, cur = None, None
+    chat_history = []
+    employee_list = []
+    try:
+        conn = get_db_connection()
+        if not conn: raise oracledb.Error("DB connection failed")
+        cur = conn.cursor()
+
+        # Fetch messages WHERE the current user is sender OR recipient
+        cur.rowfactory = lambda *args: dict(zip([d[0].lower() for d in cur.description], args))  # Set rowfactory
+        cur.execute("""
+            SELECT
+                cm.message_id, cm.sender_id, sender.name as sender_name,
+                cm.recipient_id, recipient.name as recipient_name,
+                cm.message_text, cm.sent_at, cm.message_type
+            FROM chat_messages cm
+            JOIN employee sender ON cm.sender_id = sender.emp_id
+            LEFT JOIN employee recipient ON cm.recipient_id = recipient.emp_id
+            WHERE cm.sender_id = :current_user OR cm.recipient_id = :current_user
+            ORDER BY cm.sent_at ASC
+        """, {'current_user': emp_id})
+        chat_history = cur.fetchall()  # Returns list of dicts
+
+        # Fetch list of all employees (including self) for the recipient dropdown
+        cur.rowfactory = None  # Reset rowfactory
+        cur.execute("SELECT emp_id, name FROM employee ORDER BY name ASC")
+        employee_list = fetch_all_as_dict(cur)  # Use helper
+
+    except oracledb.Error as err:
+        flash(f"Error fetching chat data: {err}", "danger")
+        print(f"Chat Load Error: {err}")
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+    return render_template('chat.html',
+                           chat_history=chat_history,
+                           employee_list=employee_list)
 
 
+@socketio.on('connect')
+def handle_connect(auth=None):
+    """Track connected users and join their personal chat room."""
+    if 'emp_id' not in session:
+        return False
+
+    emp_id = session['emp_id']
+    name = session.get('name', f'User {emp_id}')
+    user_sids[emp_id] = {'sid': request.sid, 'name': name}
+
+    join_room(str(emp_id))  # ✅ Each user joins their unique room
+    print(f"--- SocketIO: {name} (ID: {emp_id}) joined room {emp_id} ---")
+
+    # Send past messages
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cm.sender_id, s.name AS sender_name,
+                   cm.recipient_id, r.name AS recipient_name,
+                   cm.message_text, cm.sent_at
+            FROM chat_messages cm
+            JOIN employee s ON cm.sender_id = s.emp_id
+            LEFT JOIN employee r ON cm.recipient_id = r.emp_id
+            WHERE cm.sender_id = :emp OR cm.recipient_id = :emp
+            ORDER BY cm.sent_at ASC
+        """, {'emp': emp_id})
+        past_msgs = fetch_all_as_dict(cur)
+
+        # Convert datetime to ISO strings
+        for msg in past_msgs:
+            if isinstance(msg.get('sent_at'), datetime.datetime):
+                msg['sent_at'] = msg['sent_at'].isoformat()
+
+        emit('load_history', past_msgs, room=request.sid)
+
+    except Exception as e:
+        print(f"Error loading past messages: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+
+@socketio.on('disconnect')
+def handle_disconnect(sid):
+    """Remove disconnected users from tracking."""
+    disconnected_emp_id = None
+    for emp_id, u_info in list(user_sids.items()):
+        if u_info['sid'] == sid:  # ← use the sid argument directly
+            disconnected_emp_id = emp_id
+            break
+
+    if disconnected_emp_id:
+        user_sids.pop(disconnected_emp_id, None)
+        print(f"--- SocketIO: Client disconnected: (ID: {disconnected_emp_id}) ---")
+
+
+@socketio.on('message')
+def handle_message(data):
+    """Handles incoming messages, saves to DB, emits to recipient and sender."""
+    if 'emp_id' not in session: return
+    sender_id = session['emp_id']
+    sender_name = session.get('name', f'User {sender_id}')
+    target_id_str = data.get('target_id')
+    message_text = data.get('msg')
+
+    if not message_text or not message_text.strip(): return
+    if not target_id_str:
+        emit('message', {'msg': "Please select a recipient.", 'sender_name': 'System', 'type': 'system'},
+             room=request.sid)
+        return
+
+    try:
+        recipient_id = int(target_id_str)
+        message_db_type = 'private'  # All messages are P2P
+    except (ValueError, TypeError):
+        emit('message', {'msg': "Invalid recipient ID selected.", 'sender_name': 'System', 'type': 'system'},
+             room=request.sid)
+        return
+
+    # Fetch recipient name
+    recipient_name = f"User {recipient_id}"  # Fallback
+    recipient_info_live = user_sids.get(recipient_id)
+    if recipient_info_live:
+        recipient_name = recipient_info_live['name']
+    else:
+        conn_name, cur_name = None, None
+        try:
+            conn_name = get_db_connection()
+            cur_name = conn_name.cursor()
+            cur_name.execute("SELECT name FROM employee WHERE emp_id = :1", [recipient_id])
+            name_result = cur_name.fetchone()
+            if name_result: recipient_name = name_result[0]
+        except Exception as e:
+            print(f"Error fetching recipient name: {e}")
+        finally:
+            if cur_name: cur_name.close()
+            if conn_name: conn_name.close()
+
+    response_data = {
+        'msg': message_text, 'sender_name': sender_name, 'sender_id': sender_id,
+        'recipient_id': recipient_id, 'recipient_name': recipient_name,
+        'sent_at': datetime.datetime.now().isoformat(), 'type': message_db_type
+    }
+
+    # --- Save Message to Database ---
+    conn, cur = None, None
+    message_saved = False
+    try:
+        conn = get_db_connection()
+        if not conn:
+            raise oracledb.Error("DB connection failed")
+        cur = conn.cursor()
+        print(f"--- DEBUG: Saving msg. Sender:{sender_id}, Recipient:{recipient_id} ---")
+
+        # FIXED INSERT (remove message_type)
+        cur.execute("""
+            INSERT INTO chat_messages (sender_id, recipient_id, message_text)
+            VALUES (:sender, :recipient, :msg)
+        """, {
+            'sender': sender_id,
+            'recipient': recipient_id,
+            'msg': message_text
+        })
+
+        conn.commit()
+        message_saved = True
+        print("--- DEBUG: Message saved successfully. ---")
+
+    except oracledb.Error as e:  # fixed typo
+        if conn: conn.rollback()
+        print(f"!!!!!!!!!! Chat DB SAVE ERROR: {e} !!!!!!!!!!!")
+        emit('message', {'msg': f"Error saving message: {e}", 'sender_name': 'System', 'type': 'system'},
+             room=request.sid)
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+    # --- Emit Live Message ONLY if saved successfully ---
+    if message_saved:
+        response_data = {
+            'msg': message_text,
+            'sender_name': sender_name,
+            'sender_id': sender_id,
+            'recipient_id': recipient_id,
+            'recipient_name': recipient_name,
+            'sent_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'type': message_db_type
+        }
+
+        # ✅ Emit to recipient's room
+        emit('message', response_data, room=str(recipient_id))
+
+        # ✅ Emit to sender's room (so they also see their message)
+        emit('message', response_data, room=str(sender_id))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    socketio.run(app, debug=True)
 
